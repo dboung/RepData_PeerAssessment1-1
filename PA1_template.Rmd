@@ -1,0 +1,150 @@
+---
+title: "Peer Assignment1"
+author: "Disovankiri Boung"
+date: "6/18/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+<br>
+**Load Libraries**
+
+```{r library, echo=TRUE, warning=FALSE,message=FALSE}
+#load library
+library(ggplot2)
+library(dplyr)
+library(knitr)
+library(lubridate)
+```
+
+### What is mean total number of steps taken per day?
+
+** Load the data**
+```{r echo = TRUE}
+#read csv file into dataframe named df
+df <- read.csv("activity.csv")
+head(df)
+```
+
+**1. Calculate the total number of steps taken per day**
+```{r}
+sum_steps_by_date <- aggregate(steps~date, df,sum,na.action = NULL )
+
+kable(sum_steps_by_date)
+```
+
+**2.Histogram of the total number of steps taken each day**
+```{r NULL,warning=FALSE,message=FALSE}
+ggplot(data = sum_steps_by_date,aes(x=steps)) + geom_histogram(bins=10) +labs(x="steps",y="count",title="Histogram") + theme_bw()
+
+```
+
+**3. Report mean and median of number of steps taken each day**
+```{r}
+mean_steps_by_date <- aggregate(steps~date,df, mean,na.action = NULL)
+names(mean_steps_by_date) <- c("date","mean")
+
+median_steps_by_date <- aggregate(steps~date,df,median,na.action = NULL) 
+names(median_steps_by_date) <- c("date","median")
+
+df3 <- merge(mean_steps_by_date,median_steps_by_date)
+
+kable(df3)
+```
+
+### What is the average daily activity pattern?
+
+**1. Time-series plot of average steps by day**
+
+```{r}
+mean_steps_by_interval <- aggregate(steps~interval,df,mean)
+
+ggplot(mean_steps_by_interval,aes(x=interval,y=steps)) + geom_line() + theme_bw() + labs (xlab="5 minutes interval", ylab="Average number of steps", title="Time-series of average steps by interval")
+```
+
+**2. 5 minute intervals that has maximum average steps across all day**
+```{r}
+max_index <- which(mean_steps_by_interval$steps==max(mean_steps_by_interval$steps))
+
+paste("The 5-minutes interval that has the maximum average steps across days is", mean_steps_by_interval[max_index,1])
+      
+```
+
+### Imputing missing values
+
+**1. Calculate and report the total number of missing values in the datase**
+```{r}
+length(which(is.na(df)))
+```
+
+**2. Filling na value with mean of steps that day**
+
+```{r}
+imputed_df <- df %>%
+  mutate(
+    steps = case_when(
+      is.na(steps) ~ mean_steps_by_interval$steps[match(df$interval, mean_steps_by_interval$interval)],      
+      TRUE ~ as.numeric(steps)
+    ))
+
+any(is.na(imputed_df))
+```
+
+**3. Fill in the dataset**
+```{r}
+kable(head(imputed_df))
+```
+
+
+**4.Make a histogram of the total number of steps taken each day**
+```{r}
+df2_sum <- aggregate(steps~date, imputed_df,sum )
+ggplot(data = df2_sum,aes(x=steps)) +
+geom_histogram(bins=10) +labs(x="steps",y="count",title="Histogram") + theme_bw()
+```
+The total number of each day increased after we used the imputed dataset.
+
+```{r}
+df2_mean<- aggregate(steps~date,imputed_df, mean)
+names(df2_mean) <- c("date","mean")
+
+df2_median<- aggregate(steps~date,imputed_df, median)
+names(df2_median) <- c("date","median")
+
+df4 <- merge(df2_mean,df2_median)
+
+kable(df4)
+```
+
+### Are there differences in activity patterns between weekdays and weekends?
+
+**1. Create two factors**
+```{r}
+
+new_df <- imputed_df %>%
+  mutate(
+    date = ymd(date),
+    day_of_week = case_when(wday(date) %in% 2:6 ~ "Weekday",
+                                   wday(date) %in% c(1,7) ~ "Weekend")
+  ) %>% select(-date) %>%
+  group_by(interval, day_of_week) %>%
+  summarise(
+    steps = mean(steps)
+  )
+
+head(new_df)
+```
+
+**2. Plot**
+```{r}
+ggplot(new_df, aes(interval, steps)) + 
+  geom_line() + 
+  facet_wrap(~day_of_week, nrow = 2) +
+  xlab("5-Minute intervals") + 
+  ylab("Average number of steps") + theme_bw()
+```
+
